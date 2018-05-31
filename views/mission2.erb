@@ -1,0 +1,518 @@
+<style>
+  .mars_pic {
+    background-image: url("/mars_surface.png");
+    /* background-repeat: no-repeat; */
+    background-size: cover;
+  }
+  #cheese{
+    position:relative;
+    width:700px;
+    height:700px;
+    margin: 0 auto;
+}
+#historyCanvas,#grid_canvas,#roverCanvas{
+    position:absolute; top:0px; left:0px;
+    width:700px;
+    height:700px;
+}
+</style>
+
+<body background="surface_control.jpg" onload="create_div()">
+
+  <img id="rover_image" style="display: none;" src="car.jpg">
+
+
+  <audio id="boomAudio" source src="/explosion_sound.mp3" type="audio/mpeg" preload="auto"></audio>
+
+
+  <%rover1_route = session[:rover_routes]["rover1"]%>
+  <%rover2_route = session[:rover_routes]["rover2"]%>
+
+
+  <div id="cheese" class = "whiz">
+    <canvas  id="grid_canvas" class="mars_pic" width="700" height="700"></canvas>
+    <canvas  id="historyCanvas" width="700" height="700"></canvas>
+    <canvas  id="roverCanvas" width="700" height="700"></canvas>
+
+  </div>
+
+  <img src="/car.jpg" hidden id="roverNorth">
+  <img src="/car(s).jpg" hidden id="roverSouth">
+  <img src="/car(e)/jpg" hidden id="roverEast">
+  <img src="/car(w).jpg" hidden id="roverWest">
+
+  <form  action="again" method="post">
+    <input type="submit" value="Try Again">
+  </form>
+
+</body>
+
+<script>
+
+var grid_string = '<%= session[:grid_size].to_json %>';
+var grid_size = JSON.parse(grid_string);
+var all_rovers_hash = JSON.parse('<%= session[:rover_routes].to_json %>');
+var all_rovers_array = [];
+var rover_array_counter = 0;
+var line_x_offset = 0;
+var line_y_offset = 0;
+var history_canvas = document.getElementById('historyCanvas');
+var history_ctx = history_canvas.getContext("2d");
+var line_color = "red";
+var iterateRoverArray_counter = 0
+var largest_grid_size = Math.max(grid_size[0], grid_size[1]);
+var multiplyer = 700 / (largest_grid_size + 1);
+var explosionArray = [];
+var finished_animation = false;
+var end_of_moves_array = false;
+var first_move = true;
+var done = false;
+var drawRoverMarker = true;
+var firstPosition = [];
+
+for (var index in all_rovers_hash) {
+  all_rovers_array.push(all_rovers_hash[index]);
+}
+
+var position1_array = all_rovers_array[0][0];
+var position2_array = all_rovers_array[0][0];
+
+
+function drawGrid(grid_size) {
+    var c = document.getElementById("grid_canvas");
+    var ctx = c.getContext("2d");
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "green";
+    // ctx.strokeRect(2,2,498,498);
+    //draw vertical lines
+    var i;
+    // console.log(`multiplyer is ${multiplyer}`)
+    for (i = 0; i < grid_size[0] + 2; i++) {
+        ctx.moveTo(multiplyer * i, 0);
+        ctx.lineTo(multiplyer * i, (grid_size[1] + 1) * multiplyer);
+        ctx.stroke();
+    }
+    //draw horizontal lines
+    // console.log(`multiplyer is ${multiplyer}`)
+    for (i = 0; i < grid_size[1] + 2; i++) {
+        ctx.moveTo(0, multiplyer * i);
+        ctx.lineTo((grid_size[0] + 1) * multiplyer, multiplyer * i);
+        ctx.stroke();
+    }
+
+    for (i = 0; i < grid_size[0] + 1; i++) {  // put x and y coordinate numbers on grid
+      ctx.font=`${0.25 * multiplyer}px Georgia`;
+      ctx.fillText(i, (i * multiplyer) + 0.4 * multiplyer, ((grid_size[1]) * multiplyer) + 0.90 * multiplyer);
+      ctx.fillText(i, 5,((grid_size[1] - i) * multiplyer) + 0.55 * multiplyer);
+    }
+}
+
+
+function get_next_rover_array() {
+    console.log("Hitting get_next_rover_array")
+    current_rover_array = all_rovers_array[rover_array_counter];
+    console.log(`current_rover_array is ${current_rover_array}`);
+    rover_array_counter += 1
+    end_of_moves_array = false;
+    first_move = true;
+    iterateRoverArray_counter = 0;
+    // iterateRoverArray();
+    console.log("Sending to traffic_cop from get_next_rover_array")
+    // traffic_cop();
+}
+
+
+function traffic_cop() {
+        // console.log("Hitting traffic_cop")
+        console.log(`postion1_array in traffic_cop is ${position1_array}`);
+        console.log(`postion2_array in traffic_cop is ${position2_array}`);
+        console.log("The explosionArray is...");
+        console.log(explosionArray);
+
+    if(first_move == true){
+      console.log("It is the first move");
+        // position2_array = position1_array;
+      if(check_if_explosion(position1_array)){
+
+        explode(position1_array);
+      } else {
+      first_move = false;
+      drawRoverMarker = true;
+      traffic_cop();
+      }
+    } else if(end_of_moves_array == true) {
+        draw_rover_history_image(position2_array);
+        if(check_if_explosion(position2_array)) {
+            draw_explosion(position2_array);
+        } else {
+          explosionArray.push(position2_array);
+        }
+        setTimeout(get_next_rover_array_setup(),2000);
+        get_next_rover_array_setup();
+        get_next_rover_array();
+        iterateRoverArray();
+        traffic_cop();
+
+    } else if(check_if_rotation()) {
+        finished_animation = false;
+        rotate_rover();
+        wait_for_animation();;
+        function wait_for_animation(){
+          if(finished_animation == true){
+              if(check_if_explosion(position2_array)) {
+                explode(position2_array);
+              }
+              iterateRoverArray();
+              traffic_cop();
+          } else {
+            setTimeout(wait_for_animation,10);
+          }
+        }
+
+    } else if(check_if_move()) {
+        finished_animation = false;
+        move_rover();
+        wait_for_animation();
+        function wait_for_animation(){
+          if(finished_animation == true){
+            if(check_if_explosion(position2_array)) {
+                explode(position2_array);
+            } else {
+              iterateRoverArray();
+              traffic_cop();
+            }
+
+          } else {
+            setTimeout(wait_for_animation,50);
+          }
+        }
+        }
+
+}
+
+
+function explode(bangZone){
+  console.log("The bangZone is...");
+  console.log(bangZone);
+    done = false;
+    draw_explosion(bangZone);
+    wait_for_explosion();
+    function wait_for_explosion(){
+      if(done == false){
+        setTimeout(wait_for_explosion,1);
+      } else {
+        done = false;
+        setTimeout(playExplosionSound,1);
+        wait_for_sound();
+        function wait_for_sound(){
+          if(done == false){
+            setTimeout(wait_for_sound,1);
+          } else {
+            done = false;
+            setTimeout(clearExplosion(bangZone),100);
+            wait_for_clear();
+            function wait_for_clear(){
+              if(done == false){
+                setTimeout(wait_for_clear,1);
+              } else {
+                done = false;
+                setTimeout(drawScorch(bangZone),100);
+                wait_for_scorch();
+                function wait_for_scorch(){
+                  if(done == false){
+                    setTimeout(wait_for_scorch,1);
+                  } else {
+                    for(pos of explosionArray){
+                      if (pos[0] == position2_array[0] && pos[1] == position2_array[1]){ //selects the correct position from explosion array.  Has to be done this way because directions are not necessarily the same in the position arrays.
+                        var index = explosionArray.indexOf(pos);
+                      }
+                    }
+                    explosionArray.splice(index, 1); // deletes the position(where explosion happened) from explosionArray
+
+                    get_next_rover_array_setup();
+                    get_next_rover_array();
+                    iterateRoverArray();
+                    traffic_cop();
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+
+function playExplosionSound () {
+  var sound = document.getElementById("boomAudio");
+  sound.load();
+  sound.play();
+  done = true;
+}
+
+
+function clearExplosion(bangZone){
+  var history_canvas = document.getElementById('historyCanvas');
+  var history_ctx = history_canvas.getContext("2d");
+  var history_img = new Image;
+  history_img.src = '/scorch.png';
+  var x_position = (bangZone[0] * multiplyer);
+  var y_position = (((grid_size[1]) - bangZone[1]) * multiplyer);
+  history_ctx.clearRect(x_position, y_position, multiplyer, multiplyer); // clears explosion and rovers at that position.
+
+  var rover_canvas = document.getElementById('roverCanvas');
+  var ctx = rover_canvas.getContext("2d");
+  ctx.clearRect(x_position, y_position, multiplyer, multiplyer); // clears last rover draw from rover canvas(ctx).
+  done = true;
+}
+
+
+function drawScorch(bangZone) {
+  console.log("Drawing Scorch");
+  var history_canvas = document.getElementById('historyCanvas');
+  var history_ctx = history_canvas.getContext("2d");
+  var history_img = new Image;
+  var x_position = (bangZone[0] * multiplyer);
+  var y_position = (((grid_size[1]) - bangZone[1]) * multiplyer);
+  history_img.src = '/scorch.png';
+  history_ctx.drawImage(history_img, x_position, y_position, multiplyer * 1, multiplyer * 1);
+  console.log("drew scorch");
+  done = true;
+}
+
+
+function iterateRoverArray() {
+  console.log(`iterateRoverArray_counter at the beginning of iterateRoverArray is ${iterateRoverArray_counter}`);
+  position1_array = current_rover_array[iterateRoverArray_counter];
+  position2_array = current_rover_array[iterateRoverArray_counter + 1];
+    if (position2_array === undefined) { // this happens if we have come to the end of the current_rover_array.
+      console.log("position2_array is undefined");
+      // console.log("this happens if we have come to the end of the current_rover_array")
+        position2_array = current_rover_array[current_rover_array.length -1 ];
+        position1_array = current_rover_array[current_rover_array.length -1 ];
+        end_of_moves_array = true;
+
+    } else {
+        position1_array = current_rover_array[iterateRoverArray_counter]; //this happens for every other iterated position in current_rover_array...information is sent to check_if_explosion
+        position2_array = current_rover_array[iterateRoverArray_counter + 1];
+    }
+    console.log(`postion1_array in iterate is ${position1_array}`);
+    console.log(`postion2_array in iterate is ${position2_array}`);
+      iterateRoverArray_counter += 1;
+}
+
+
+function draw_rover_history_image(position_array) {
+    // console.log("Just hit the draw_rotation_image function")
+    var history_img = new Image;
+    switch (position_array[2]) {
+        case "N":
+            history_img.src = "/car.jpg"
+            break;
+        case "E":
+            history_img.src = "/car(e).jpg"
+            break;
+        case "S":
+            history_img.src = "/car(s).jpg"
+            break;
+        case "W":
+            history_img.src = "/car(w).jpg"
+            break;
+    }
+    var history_canvas = document.getElementById('historyCanvas');
+    var history_ctx = history_canvas.getContext("2d");
+    var x_position = (position_array[0] * multiplyer) + 0.25 * multiplyer;
+    var y_position = (((grid_size[1]) - position_array[1]) * multiplyer) + 0.25 * multiplyer
+
+    history_img.onload = drawHistImage;
+
+    function drawHistImage(){
+    history_ctx.drawImage(history_img, x_position, y_position, multiplyer * 0.5, multiplyer * 0.5);
+    }
+}
+
+
+function draw_explosion(danger_zone) {
+
+    var explosionFrames = [
+      '/explosion_frames/frame_00_delay-0.1s.gif', '/explosion_frames/frame_01_delay-0.1s.gif', '/explosion_frames/frame_02_delay-0.1s.gif', '/explosion_frames/frame_03_delay-0.1s.gif', '/explosion_frames/frame_04_delay-0.1s.gif', '/explosion_frames/frame_05_delay-0.1s.gif', '/explosion_frames/frame_06_delay-0.1s.gif', '/explosion_frames/frame_07_delay-0.1s.gif', '/explosion_frames/frame_08_delay-0.1s.gif', '/explosion_frames/frame_09_delay-0.1s.gif', '/explosion_frames/frame_10_delay-0.1s.gif', '/explosion_frames/frame_11_delay-0.1s.gif', '/explosion_frames/frame_12_delay-0.1s.gif', '/explosion_frames/frame_13_delay-0.1s.gif', '/explosion_frames/frame_14_delay-0.1s.gif', '/explosion_frames/frame_15_delay-0.1s.gif', '/explosion_frames/frame_16_delay-0.1s.gif', '/explosion_frames/frame_17_delay-0.1s.gif', '/explosion_frames/frame_18_delay-0.1s.gif', '/explosion_frames/frame_19_delay-0.1s.gif', '/explosion_frames/frame_20_delay-0.1s.gif', '/explosion_frames/frame_21_delay-0.1s.gif', '/explosion_frames/frame_22_delay-0.1s.gif', '/explosion_frames/frame_23_delay-0.1s.gif', '/explosion_frames/frame_24_delay-0.1s.gif', '/explosion_frames/frame_25_delay-0.1s.gif', '/explosion_frames/frame_26_delay-0.1s.gif', '/explosion_frames/frame_27_delay-0.1s.gif', '/explosion_frames/frame_28_delay-0.1s.gif', '/explosion_frames/frame_29_delay-0.1s.gif', '/explosion_frames/frame_30_delay-0.1s.gif', '/scorch.png']
+    // history_img.src = "/explosion_frames/frame_23_delay-0.1s.gif";
+    var history_canvas = document.getElementById('historyCanvas');
+    var history_ctx = history_canvas.getContext("2d");
+    var x_position = (danger_zone[0] * multiplyer) + 0.10 * multiplyer;
+    var y_position = (((grid_size[1]) - danger_zone[1]) * multiplyer) + 0.10 * multiplyer
+    var pic;
+    var explosionCounter = 0;
+    var history_img = new Image;
+    history_img.src = '/explosion_frames/frame_00_delay-0.1s.gif';
+  window.requestAnimationFrame(boom);
+  function boom(){
+              history_ctx.drawImage(history_img, x_position, y_position, multiplyer * 0.75, multiplyer * 0.75);
+              console.log("boom");
+if (explosionCounter < 31) {
+    explosionCounter += 1;
+    history_img = new Image;
+    history_img.src = explosionFrames[explosionCounter];
+    history_img.onload=animateBoom;
+
+    function animateBoom(){
+      // window.requestAnimationFrame(boom);
+      boom();
+    }
+} else {
+  console.log("finished boom");
+  done = true;
+}
+}
+}
+
+
+function get_next_rover_array_setup() {
+    // selects a random color for rover trail.
+    line_color = '#' + (function co(lor) {return (lor += [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 'a', 'b', 'c', 'd', 'e', 'f'][Math.floor(Math.random() * 16)]) && (lor.length == 6) ? lor : co(lor);})('');
+    // line_x_offset = 3;
+    // line_y_offset = 3;
+    line_x_offset = Math.floor(Math.random()*6) + 1;
+    line_x_offset *= Math.floor(Math.random()*2) == 1 ? 1 : -1;
+    line_y_offset = line_x_offset;
+}
+
+
+function check_if_explosion(possiblePosition) {
+  console.log(explosionArray);
+    explosionCounter = 0;
+    for(positions of explosionArray){
+      if(positions[0] == possiblePosition[0] && positions[1] == possiblePosition[1]){
+        explosionCounter += 1;
+      }
+    }
+    if(explosionCounter > 0) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+
+function check_if_move() {
+    if (position1_array[2] == position2_array[2]) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+
+function move_rover() {
+    var x = (position1_array[0] * multiplyer) + 0.25 * multiplyer;
+    var y = (((grid_size[1]) - position1_array[1]) * multiplyer) + 0.25 * multiplyer;
+    var direction = position1_array[2];
+    var loops = multiplyer;
+    setTimeout(drawRover(x, y, direction, loops),500);
+}
+
+
+function check_if_rotation() {
+    if (position1_array[2] != position2_array[2]) {
+        return true //indicates that the the next action is a rotation
+    } else {
+        return false;
+    }
+}
+
+
+function rotate_rover() {
+    var x = (position2_array[0] * multiplyer) + 0.25 * multiplyer;
+    var y = ((grid_size[1] - position2_array[1]) * multiplyer) + 0.25 * multiplyer;
+    var direction = position2_array[2];
+    var loops = 1;
+    drawRover(x, y, direction, loops);
+}
+
+
+function drawRover(x, y, direction, loops) {
+
+var animation_counter = 1;
+var imgTag = new Image();
+
+var rover_canvas = document.getElementById('roverCanvas');
+var ctx = rover_canvas.getContext("2d");
+animate();
+// imgTag.src = "/red-rover.png"; // load image
+function animate() {
+    ctx.clearRect(0, 0, 700, 700); // clear canvas
+    if (y < 0) {
+        y = rover_canvas.height;
+    } else if (y > rover_canvas.height) {
+        y = 0;
+    } else if (x < 0) {
+        x = rover_canvas.width;
+    } else if (x > rover_canvas.width) {
+        x = 0;
+    }
+    var previous_x = x;
+    var previous_y = y;
+    // var imgTag = new Image();
+
+    // imgTag.onload = function(){
+
+
+    switch (direction) {
+        case "N":
+            imgTag = document.getElementById('roverNorth');
+            // imgTag.src = "/red-rover.png";
+            y -= 1;
+            break;
+        case "E":
+            imgTag = document.getElementById('roverEast');
+            // imgTag.src = "/red-rover_E.png";
+            x += 1;
+            break;
+        case "S":
+            imgTag = document.getElementById('roverSouth');
+            // imgTag.src = "/red-rover_S.png";
+            y += 1;
+            break;
+        case "W":
+            imgTag = document.getElementById('roverWest');
+            // imgTag.src = "/red-rover_W.png";
+            x -= 1;
+            break;
+    }
+
+      ctx.drawImage(imgTag, x, y, multiplyer * 0.5, multiplyer * 0.5);
+
+    if(drawRoverMarker == true){
+        history_ctx.font=`${0.25 * multiplyer}px Georgia`;
+        history_ctx.fillText(`R-${rover_array_counter}`, x + 0.1 * multiplyer, y + 0.4 * multiplyer);
+        drawRoverMarker = false;
+      }
+      history_ctx.lineWidth = 2;
+      history_ctx.beginPath();
+      history_ctx.strokeStyle = line_color;
+      history_ctx.moveTo((previous_x + line_x_offset) + 0.25 * multiplyer, (previous_y + line_y_offset) + 0.25 * multiplyer);
+      history_ctx.lineTo((x + line_x_offset) + 0.25 * multiplyer, (y + line_y_offset) + 0.25 * multiplyer);
+      history_ctx.stroke();
+      history_ctx.closePath();
+
+    if (animation_counter < loops) {
+        animation_counter += 1;
+        window.requestAnimationFrame(animate)
+    } else {
+      finished_animation = true;
+      // setTimeout(iterateRoverArray(),500);
+      // setTimeout(traffic_cop(),500);
+    }
+}
+  // console.log("Should be returning to function call in traffic_cop");
+
+
+}
+function create_div() {
+drawGrid(grid_size);
+get_next_rover_array();
+iterateRoverArray();
+traffic_cop();
+}
+</script>

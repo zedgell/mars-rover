@@ -37,9 +37,9 @@
   </div>
 
   <img src="/car.jpg" hidden id="roverNorth">
-  <img src="/car(s).jpg" hidden id="roverSouth">
-  <img src="/car(e)/jpg" hidden id="roverEast">
-  <img src="/car(w).jpg" hidden id="roverWest">
+  <img src="/cars.jpg" hidden id="roverSouth">
+  <img src="/care.jpg" hidden id="roverEast">
+  <img src="/carw.jpg" hidden id="roverWest">
 
   <form  action="again" method="post">
     <input type="submit" value="Try Again">
@@ -311,13 +311,13 @@ function draw_rover_history_image(position_array) {
             history_img.src = "/car.jpg"
             break;
         case "E":
-            history_img.src = "/car(e).jpg"
+            history_img.src = "/care.jpg"
             break;
         case "S":
-            history_img.src = "/car(s).jpg"
+            history_img.src = "/cars.jpg"
             break;
         case "W":
-            history_img.src = "/car(w).jpg"
+            history_img.src = "/carw.jpg"
             break;
     }
     var history_canvas = document.getElementById('historyCanvas');
@@ -357,7 +357,6 @@ if (explosionCounter < 31) {
     history_img.onload=animateBoom;
 
     function animateBoom(){
-      // window.requestAnimationFrame(boom);
       boom();
     }
 } else {

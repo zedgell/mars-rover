@@ -27,15 +27,15 @@ post "/mission_info" do
 	grid_size_y = params[:grid_y_value].to_i
 	session[:grid_size] = [grid_size_x, grid_size_y]
 
-	rover1_start_x = params[:rover1_x_value].to_i
-	rover1_start_y = params[:rover1_y_value].to_i
-	rover1_direction = params[:rover1_direction]
-	rover1_moves = params[:rover1_moves]
+	# rover1_start_x = params[:rover1_x_value].to_i
+	# rover1_start_y = params[:rover1_y_value].to_i
+	# rover1_direction = params[:rover1_direction]
+	# rover1_moves = params[:rover1_moves]
 
-	rover2_start_x = params[:rover2_x_value].to_i
-	rover2_start_y = params[:rover2_y_value].to_i
-	rover2_direction = params[:rover2_direction]
-	rover2_moves = params[:rover2_moves]
+	# rover2_start_x = params[:rover2_x_value].to_i
+	# rover2_start_y = params[:rover2_y_value].to_i
+	# rover2_direction = params[:rover2_direction]
+	# rover2_moves = params[:rover2_moves]
 
 	session[:number_of_rovers] = rover_x_values_arr.length
 
